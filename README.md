@@ -10,9 +10,9 @@ Os exercícios encontram-se dentro do diretório do seu respectivo módulo.
 
 Abaixo estão os módulos iniciais cobertos neste repositório:
 
-1. **Comece por aqui**
+1. **[Comece por aqui](./1-Comece-por-aqui)**
    * Orientações gerais, configuração do ambiente de desenvolvimento e diretrizes para os laboratórios.
-2. **Fundamentos da IA**
+2. **[Fundamentos da IA](./2-Fundamentos-de-IA)**
    * Conceitos essenciais de Machine Learning, Deep Learning e a aplicação de modelos em infraestrutura.
 3. **[Engenharia de Prompt e Contexto](./3-Engenharia-de-prompt-e-contexto)**
    * Técnicas avançadas para extrair o máximo de LLMs (Large Language Models), criação de agentes e estratégias de contexto para automação de tarefas operacionais.
