@@ -9,14 +9,14 @@ Crie um script bash de backup do banco PostgreSQL de nome ledger_prod que roda e
 # Format
 Retorne o script bash e as orientações de agendamento do backup, não retorne explicações
 ```
-
 ---
+
 ## Modelo
 ```
 Gemini 3 Flash e Sonet 4.6
 ```
-
 ---
+
 ## Output Gemini 3 Flash
 ```
 #!/bin/bash
@@ -308,8 +308,9 @@ sudo crontab -l
 #         notifempty
 #     }
 ```
-
 ---
+
 ## Justificativa
 ```
+
 ```

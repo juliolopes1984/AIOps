@@ -10,11 +10,13 @@ Escreva o Dockerfile para a API Lift, que foi desenvolvida em Python/Flask, roda
 Retorne apenas o arquivo Dockerfile, sem explicações
 ```
 ---
+
 ## Modelo:
 ```
 Gemini 3 Flash e Sonet 4.6
 ```
 ---
+
 ## Output Gemini 3 Flash:
 ```
 FROM python:3.11-slim
@@ -98,6 +100,7 @@ ENV DATABASE_URL=${DATABASE_URL} \
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "app:app"]
 ```
 ---
+
 ## Justificativa:
 ```
 
