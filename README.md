@@ -14,7 +14,7 @@ Abaixo estão os módulos iniciais cobertos neste repositório:
    * Orientações gerais, configuração do ambiente de desenvolvimento e diretrizes para os laboratórios.
 2. **Fundamentos da IA**
    * Conceitos essenciais de Machine Learning, Deep Learning e a aplicação de modelos em infraestrutura.
-3. **[Engenharia de Prompt e Contexto](./3.%2520Engenharia%2520de%2520prompt%2520e%2520contexto)**
+3. **[Engenharia de Prompt e Contexto](./3-Engenharia-de-prompt-e-contexto)**
    * Técnicas avançadas para extrair o máximo de LLMs (Large Language Models), criação de agentes e estratégias de contexto para automação de tarefas operacionais.
 
 ## 📺 Acesso às Aulas
