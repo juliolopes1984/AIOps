@@ -312,5 +312,5 @@ sudo crontab -l
 
 ## Justificativa
 ```
-
+A Role define a persona técnica e o nível de senioridade (SRE especialista em Linux, PostgreSQL e AWS); a Task delimita a ação prática a ser executada com todos os seus requisitos técnicos e variáveis (desenvolver o script de backup e retenção); e o Format dita a estrutura final da resposta (apenas o código e o agendamento cron), restringindo textualmente qualquer tipo de explicação adicional.
 ```

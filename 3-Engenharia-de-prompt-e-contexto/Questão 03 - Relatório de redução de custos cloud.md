@@ -200,5 +200,5 @@ Se quiser, posso montar um **plano técnico detalhado (com comandos AWS / Terraf
 
 ## Justificativa
 ```
-
+A Task estebelece a análise dos dados do CSV com os valores do ambiente na AWS para mapeamento das oportunidades de economia, riscos e esforços; a Action especifica uma tabela técnica ordenada por impacto e um plano de execução semanal; a o Goal determina o objetivo final da tarefa que é a redução de 15% dos custos com Cloud até o final do trimestre sem comprometer o SLA e a performance.
 ```

@@ -103,5 +103,5 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120",
 
 ## Justificativa:
 ```
-
+O framework RTF, utilizado nesta atividade é bem definida, onde a Role define o papel com o qual o desejo que a IA veja a questão (um SRE Sênior especialista em K8s) e a temperatura; a Task define o ambiente onde a API está sendo provisionada e características da API para guiar a criação do Dockerfile; o Format define como o output deve ser apresentado pela IA (apenas o arquivo Dockerfile sem explicações).
 ```
