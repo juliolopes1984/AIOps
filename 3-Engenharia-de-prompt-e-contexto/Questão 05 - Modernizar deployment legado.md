@@ -25,13 +25,12 @@ GPT-5.5 e Opus 4.7
 ---
 
 ## Output GPT-5.5:
-```
+
 O manifesto atual tem vários problemas clássicos: 1 réplica (sem HA), uso de `latest`, secrets hardcoded, ausência de limites de recursos, nenhuma probe e falta de segurança básica.
 
 Abaixo está uma versão reescrita seguindo boas práticas modernas de Kubernetes, com **comentários explicando cada parte**:
 
-yaml
----
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -130,6 +129,7 @@ spec:
                   matchLabels:
                     app: chronos-api
                 topologyKey: "kubernetes.io/hostname"
+```
 
 ---
 
@@ -175,10 +175,10 @@ Se quiser, posso também te entregar:
 * Ou converter isso para Helm/Terraform para padronização enterprise
 
 Só dizer 👍
-```
+
 
 ## Output Opus 4.7:
-```
+
 # Reescrita do Manifesto Kubernetes — Chronos API
 
 Vou analisar o manifesto original e reescrevê-lo aplicando as novas práticas. Antes de mostrar o resultado, vale destacar os principais problemas do manifesto atual:
@@ -195,8 +195,7 @@ Vou analisar o manifesto original e reescrevê-lo aplicando as novas práticas. 
 
 ## Manifesto reescrito
 
-yaml
----
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -398,7 +397,7 @@ spec:
         emptyDir: {}
       - name: cache
         emptyDir: {}
----
+```
 
 ---
 
@@ -408,8 +407,7 @@ O Deployment sozinho não cobre tudo. Para fechar o requisito de alta disponibil
 
 **PodDisruptionBudget** — garante que durante manutenções voluntárias (drain de nó, upgrade de cluster) o número de pods saudáveis não caia abaixo do mínimo:
 
-yaml
----
+```yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -420,12 +418,11 @@ spec:
   selector:
     matchLabels:
       app: chronos-api
----
+```
 
 **Secret** (criado fora do Git, idealmente via External Secrets Operator puxando de um cofre):
 
-yaml
----
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -435,7 +432,7 @@ type: Opaque
 stringData:
   db-password: "<injetado pelo cofre>"
   jwt-secret: "<injetado pelo cofre>"
----
+```
 
 **HorizontalPodAutoscaler** — se a carga varia, escalar automaticamente complementa as 3 réplicas fixas.
 
@@ -449,7 +446,7 @@ Antes de aplicar em produção, alinhe com o time:
 2. **UID 10001 no Dockerfile** — a imagem precisa criar esse usuário (`USER 10001`). Se a imagem atual roda como root, o pod não sobe.
 3. **Resources** — os valores que coloquei (250m CPU / 512Mi RAM) são um ponto de partida. O ideal é medir o consumo real com `kubectl top` ou Prometheus por alguns dias e ajustar.
 4. **Secret backend** — definir como o Secret será populado: `kubectl create secret` é aceitável para começar, mas o objetivo de médio prazo é integração com Vault/AWS Secrets Manager via ESO.
-```
+
 ---
 
 ## Justificativa:

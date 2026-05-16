@@ -20,10 +20,9 @@ Gemini 3.1 Pro e Opus 4.7
 ---
 
 ## Output Gemini 3.1 Pro:
-```
 Aqui está a query SQL (PostgreSQL) construída para atender a todos os requisitos solicitados:
 
-sql
+```sql
 SELECT 
     TO_CHAR(created_at, 'YYYY-MM') AS mes,
     category AS categoria,
@@ -44,6 +43,7 @@ ORDER BY
     mes ASC,
     categoria ASC;
 
+```
 
 ### Explicação dos recursos utilizados:
 
@@ -51,10 +51,10 @@ ORDER BY
 * **Conversão para Reais (`/ 100.0`):** Ao dividir por `100.0` (com o `.0`), forçamos o banco de dados a tratar o resultado como um valor decimal e não arredondar para o inteiro mais próximo.
 * **Formatação de Moeda com Vírgula:** O PostgreSQL usa ponto `.` como separador decimal padrão. O uso do `TO_CHAR(..., 'FM...0.00')` força a exibição de exatas duas casas decimais, enquanto a função `REPLACE()` troca o ponto por vírgula no resultado final.
 * **Agrupamento:** O `GROUP BY` considera a string do mês formatado em `YYYY-MM` e a respectiva categoria, alinhando com a exigência de exibir a saída de forma segregada por essas duas dimensões.
-```
 
+---
 ## Output Opus 4.7:
-```
+
 Olhando para o esquema e os requisitos, vou montar a query passo a passo.
 
 Pontos importantes a considerar:
@@ -66,8 +66,7 @@ Pontos importantes a considerar:
 
 Vou usar `REPLACE` para garantir a vírgula independente do locale do servidor:
 
-sql
----
+```sql
 SELECT
     TO_CHAR(created_at, 'YYYY-MM')                                      AS mes,
     category                                                            AS categoria,
@@ -87,7 +86,7 @@ GROUP BY
 ORDER BY
     mes ASC,
     categoria ASC;
----
+```
 
 Observações sobre decisões que tomei:
 
@@ -95,15 +94,16 @@ A janela `>= 2025-10-24` e `< 2026-04-24` cobre exatamente 6 meses corridos term
 
 O `REPLACE(TO_CHAR(..., 'FM999999999990.00'), '.', ',')` força a vírgula como separador decimal independentemente do `lc_numeric` do servidor — mais previsível que confiar no locale. O `FM` remove espaços de preenchimento à esquerda. Se você também quiser separador de milhar com ponto (padrão BR, ex.: `1.234,56`), troque para:
 
-sql
+```sql
 REPLACE(REPLACE(TO_CHAR(SUM(amount_cents) / 100.0, 'FM999G999G990D00'), '.', '#'), ',', '.')
+```
 
 mas isso depende novamente do locale; a versão acima (sem separador de milhar) é a mais segura sem mais informações.
 
 O `ORDER BY mes, categoria` usa os aliases — funciona em PostgreSQL na cláusula `ORDER BY`. Como `mes` é texto no formato `YYYY-MM`, a ordenação lexicográfica coincide com a cronológica, então está correto.
 
 Os índices existentes em `created_at`, `status` e `category` ajudam o planner a filtrar antes do `GROUP BY`. Se essa query for executada com frequência, um índice composto `(status, category, created_at)` seria mais eficiente que os três separados, mas isso é otimização fora do escopo do pedido.
-```
+
 ---
 
 ## Justificativa:

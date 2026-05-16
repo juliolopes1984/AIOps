@@ -288,7 +288,7 @@ sudo crontab -l
 # ------------------------------------------------------------------------------
 # Notas
 # ------------------------------------------------------------------------------
-# • A IAM role da instância deve ter as policies:
+# • A IAM role da instância deve ter as policies: 
 #     - AmazonS3FullAccess (ou policy customizada limitada ao bucket hvt-ledger-backups)
 #     - secretsmanager:GetSecretValue (para o segredo que contém PGPASSWORD)
 #

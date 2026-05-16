@@ -19,7 +19,7 @@ Gemini 3 Flash e GPT-5.5
 ---
 
 ## Output Gemini 3 Flash
-```
+
 Com base nos dados do arquivo **Questão 03.csv**, sua fatura mensal atual totaliza **US$ 41.800,00**. Para atingir a meta de redução de, no mínimo, 15% (cerca de **US$ 6.270,00/mês**) sem comprometer o SLA, foquei em otimizações que atacam o baixo uso e os modelos de compra ineficientes.
 
 Aqui está a análise técnica e o plano de ação estratégico.
@@ -78,10 +78,9 @@ Para não sobrecarregar o time de engenharia e garantir o SLA, o plano é dividi
 3. **Logs:** Antes de reduzir a retenção do CloudWatch, verifique se o time de segurança ou auditoria não exige os 90 dias originais. Se sim, mova os logs para S3 Glacier (muito mais barato) em vez de apenas deletá-los.
 
 Com essas ações, você não apenas bate a meta de 15%, como estabelece uma cultura de **FinOps** mais madura para o resto do ano!
-```
 
+---
 ## Output GPT-5.5
-```
 Analisei o arquivo e há oportunidades claras de otimização — principalmente em **EC2 on-demand, EKS, observabilidade e banco/cache subutilizados**. Abaixo está a priorização por impacto estimado, com percentuais realistas (baseados em boas práticas AWS) sem comprometer SLA.
 
 ---
@@ -195,7 +194,6 @@ Com execução disciplinada, dá para atingir **15% já no primeiro mês** e ult
 
 Se quiser, posso montar um **plano técnico detalhado (com comandos AWS / Terraform)** para implementar cada etapa.
 
-```
 ---
 
 ## Justificativa

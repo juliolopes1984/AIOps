@@ -42,25 +42,27 @@ GPT-5.5 e Opus 4.7
 ---
 
 ## Output GPT-5.5:
-```
+
 Abaixo está um módulo Terraform reutilizável para criação de buckets S3 seguindo suas diretrizes (boas práticas, segurança e padrão de tags).
+
 ---
 
 # 📦 Estrutura do módulo
 
----
+```
 s3-bucket-module/
 ├── main.tf
 ├── backend.tf
 ├── variables.tf
 ├── outputs.tf
 └── README.md
+```
+
 ---
 
 ## 🧩 main.tf
 
-hcl
----
+```hcl
 locals {
   common_tags = {
     Owner       = var.owner
@@ -114,12 +116,13 @@ resource "aws_s3_bucket_logging" "this" {
   target_bucket = var.logging_bucket
   target_prefix = "${var.bucket_name}/"
 }
+```
+
 ---
 
 ## ⚙️ backend.tf
 
-hcl
----
+```hcl
 terraform {
   required_version = ">= 1.0"
 
@@ -129,12 +132,13 @@ terraform {
     region = "us-east-1"
   }
 }
+```
+
 ---
 
 ## 🧾 variables.tf
 
-hcl
----
+```hcl
 variable "bucket_name" {
   description = "Nome do bucket S3 (usar prefixo hvt-)"
   type        = string
@@ -159,26 +163,24 @@ variable "logging_bucket" {
   description = "Bucket de destino para armazenar logs de acesso"
   type        = string
 }
----
+```
 
 ---
 
 ## 📤 outputs.tf
 
-hcl
----
+```hcl
 output "bucket_id" {
   description = "ID do bucket S3 criado"
   value       = aws_s3_bucket.this.id
 }
----
+```
 
 ---
 
 ## 📘 README.md
 
-md
----
+```md
 # S3 Bucket Module
 
 Módulo Terraform reutilizável para criação de buckets S3 seguindo boas práticas de segurança e governança.
@@ -198,19 +200,22 @@ Módulo Terraform reutilizável para criação de buckets S3 seguindo boas prát
 
 Todos os buckets devem utilizar o prefixo:
 
----
+```
+
 hvt-
----
+
+```
 
 Exemplo:
----
+```
+
 hvt-app-logs-dev
----
+
+````
 
 ## 🚀 Exemplo de uso
 
-hcl
----
+```hcl
 module "s3_bucket" {
   source = "./s3-bucket-module"
 
@@ -220,7 +225,7 @@ module "s3_bucket" {
   cost_center    = "cc-1234"
   logging_bucket = "hvt-central-logs"
 }
----
+````
 
 ## 📤 Outputs
 
@@ -228,6 +233,7 @@ module "s3_bucket" {
 | --------- | ------------------- |
 | bucket_id | ID do bucket criado |
 
+```
 
 ---
 
@@ -240,8 +246,9 @@ Se quiser, posso evoluir esse módulo com:
 Só dizer 👍
 ```
 
+
 ## Output Opus 4.7:
-```
+
 Vou criar um módulo Terraform reutilizável para buckets S3 seguindo o padrão que você forneceu. Vou estruturar os arquivos no diretório de trabalho e disponibilizá-los para download.Módulo `terraform-aws-s3-hvt` pronto. Resumo das decisões tomadas:
 
 - **Nomenclatura `hvt-`**: aplicada automaticamente no `local.bucket_name` como `hvt-<bucket_name>-<environment>`, seguindo o mesmo padrão do exemplo em produção que você passou (`hvt-vpc-${var.environment}`). Isso evita que quem consome o módulo precise lembrar de adicionar o prefixo manualmente.
@@ -253,8 +260,127 @@ Vou criar um módulo Terraform reutilizável para buckets S3 seguindo o padrão 
 
 Um ponto que vale validar com seu time: deixei `environment` com validação restrita a `dev`, `staging`, `production`. Se vocês usam outros nomes (ex.: `prd`, `hml`, `sandbox`), ajustem a lista no bloco `validation` de `variables.tf`.
 
-main.tf
----
+# README.md
+
+# terraform-aws-s3-hvt
+
+Módulo Terraform para provisionamento de buckets S3 na AWS seguindo o padrão de módulos do [terraform-aws-modules](https://github.com/terraform-aws-modules) e as práticas internas da organização.
+
+## Descrição
+
+Este módulo cria um bucket S3 com a configuração mínima de segurança exigida pela organização:
+
+- **Versionamento** habilitado por padrão (configurável).
+- **Criptografia server-side** habilitada — mínimo `SSE-S3` (`AES256`); permite optar por `SSE-KMS` informando uma chave.
+- **Bloqueio total de acesso público** (`block_public_acls`, `block_public_policy`, `ignore_public_acls`, `restrict_public_buckets`).
+- **Logging de acesso** configurado em um bucket de destino informado pela pessoa que consome o módulo.
+- **Tags obrigatórias** aplicadas automaticamente: `Owner`, `CostCenter`, `Environment` e `Name`.
+
+## Convenção de nomenclatura
+
+Todos os recursos provisionados na organização devem usar o prefixo **`hvt-`**. O módulo já adiciona esse prefixo automaticamente, além do sufixo de ambiente, ao valor de `bucket_name`:
+
+```
+hvt-<bucket_name>-<environment>
+```
+
+Exemplo: passando `bucket_name = "app-logs"` e `environment = "production"`, o bucket criado terá o nome `hvt-app-logs-production`. **Não inclua `hvt-` manualmente no valor de `bucket_name`** — isso evita duplicação.
+
+## Backend
+
+O backend é configurado em `backend.tf` para uso de S3 + DynamoDB para lock. Os valores devem ser sobrescritos no `terraform init` via `-backend-config` ou arquivo `backend.hcl`:
+
+```bash
+terraform init \
+  -backend-config="bucket=hvt-tfstate-production" \
+  -backend-config="key=s3/app-logs/terraform.tfstate" \
+  -backend-config="region=us-east-1" \
+  -backend-config="dynamodb_table=hvt-tfstate-lock" \
+  -backend-config="encrypt=true"
+```
+
+## Exemplo de uso
+
+```hcl
+module "s3_app_logs" {
+  source = "git::ssh://git@github.com/hvt/terraform-aws-s3-hvt.git?ref=v1.0.0"
+
+  bucket_name = "app-logs"
+  environment = "production"
+
+  owner       = "plataforma"
+  cost_center = "CC-1042"
+
+  # Bucket destino para logs de acesso (deve existir previamente)
+  logging_target_bucket = "hvt-s3-access-logs-production"
+  logging_target_prefix = "logs/app-logs/"
+
+  versioning_enabled = true
+  sse_algorithm      = "AES256"
+
+  additional_tags = {
+    Application = "checkout-api"
+  }
+}
+
+output "app_logs_bucket_id" {
+  value = module.s3_app_logs.id
+}
+```
+
+### Exemplo com SSE-KMS
+
+```hcl
+module "s3_sensitive_data" {
+  source = "git::ssh://git@github.com/hvt/terraform-aws-s3-hvt.git?ref=v1.0.0"
+
+  bucket_name = "sensitive-data"
+  environment = "production"
+
+  owner       = "seguranca"
+  cost_center = "CC-2001"
+
+  logging_target_bucket = "hvt-s3-access-logs-production"
+
+  sse_algorithm     = "aws:kms"
+  kms_master_key_id = "arn:aws:kms:us-east-1:123456789012:key/abcd-1234-..."
+}
+```
+
+## Inputs
+
+| Nome | Descrição | Tipo | Default | Obrigatório |
+|---|---|---|---|:---:|
+| `bucket_name` | Nome do bucket S3 (sem prefixo `hvt-` e sem sufixo de ambiente). | `string` | n/a | sim |
+| `environment` | Ambiente: `dev`, `staging` ou `production`. | `string` | n/a | sim |
+| `owner` | Time ou pessoa responsável. Tag `Owner`. | `string` | n/a | sim |
+| `cost_center` | Centro de custo. Tag `CostCenter`. | `string` | n/a | sim |
+| `logging_target_bucket` | Bucket destino para logs de acesso. | `string` | n/a | sim |
+| `logging_target_prefix` | Prefixo dentro do bucket de logging. | `string` | `""` | não |
+| `versioning_enabled` | Habilita versionamento. | `bool` | `true` | não |
+| `sse_algorithm` | `AES256` (SSE-S3) ou `aws:kms` (SSE-KMS). | `string` | `"AES256"` | não |
+| `kms_master_key_id` | Chave KMS quando `sse_algorithm = "aws:kms"`. | `string` | `null` | não |
+| `force_destroy` | Permite destruir bucket com objetos. | `bool` | `false` | não |
+| `additional_tags` | Tags adicionais mescladas às obrigatórias. | `map(string)` | `{}` | não |
+
+## Outputs
+
+| Nome | Descrição |
+|---|---|
+| `id` | ID (nome) do bucket S3 criado. |
+| `arn` | ARN do bucket. |
+| `bucket_domain_name` | Domain name do bucket. |
+| `bucket_regional_domain_name` | Domain name regional do bucket. |
+
+## Requisitos
+
+| Nome | Versão |
+|---|---|
+| terraform | `>= 1.5.0` |
+| aws provider | `>= 5.0` |
+
+# main.tf
+
 locals {
   common_tags = {
     Owner       = var.owner
@@ -310,10 +436,9 @@ resource "aws_s3_bucket_logging" "this" {
   target_bucket = var.logging_target_bucket
   target_prefix = var.logging_target_prefix != "" ? var.logging_target_prefix : "logs/${local.bucket_name}/"
 }
----
 
-variables.tf
----
+# variables.tf
+
 variable "bucket_name" {
   description = "Nome do bucket S3 (sem o prefixo 'hvt-' e sem o sufixo de ambiente, ambos adicionados automaticamente pelo módulo). Ex.: 'app-logs' resultará em 'hvt-app-logs-<environment>'."
   type        = string
@@ -384,10 +509,9 @@ variable "additional_tags" {
   type        = map(string)
   default     = {}
 }
----
 
-output.tf
----
+# output.tf
+
 output "id" {
   description = "ID (nome) do bucket S3 criado."
   value       = aws_s3_bucket.this.id
@@ -407,10 +531,9 @@ output "bucket_regional_domain_name" {
   description = "Nome de domínio regional do bucket S3."
   value       = aws_s3_bucket.this.bucket_regional_domain_name
 }
----
 
-backend.tf
----
+# backend.tf
+
 terraform {
   required_version = ">= 1.5.0"
 
@@ -439,128 +562,7 @@ terraform {
     encrypt        = true
   }
 }
----
 
-README.md
----
-# terraform-aws-s3-hvt
-
-Módulo Terraform para provisionamento de buckets S3 na AWS seguindo o padrão de módulos do [terraform-aws-modules](https://github.com/terraform-aws-modules) e as práticas internas da organização.
-
-## Descrição
-
-Este módulo cria um bucket S3 com a configuração mínima de segurança exigida pela organização:
-
-- **Versionamento** habilitado por padrão (configurável).
-- **Criptografia server-side** habilitada — mínimo `SSE-S3` (`AES256`); permite optar por `SSE-KMS` informando uma chave.
-- **Bloqueio total de acesso público** (`block_public_acls`, `block_public_policy`, `ignore_public_acls`, `restrict_public_buckets`).
-- **Logging de acesso** configurado em um bucket de destino informado pela pessoa que consome o módulo.
-- **Tags obrigatórias** aplicadas automaticamente: `Owner`, `CostCenter`, `Environment` e `Name`.
-
-## Convenção de nomenclatura
-
-Todos os recursos provisionados na organização devem usar o prefixo **`hvt-`**. O módulo já adiciona esse prefixo automaticamente, além do sufixo de ambiente, ao valor de `bucket_name`:
-
----
-hvt-<bucket_name>-<environment>
----
-
-Exemplo: passando `bucket_name = "app-logs"` e `environment = "production"`, o bucket criado terá o nome `hvt-app-logs-production`. **Não inclua `hvt-` manualmente no valor de `bucket_name`** — isso evita duplicação.
-
-## Backend
-
-O backend é configurado em `backend.tf` para uso de S3 + DynamoDB para lock. Os valores devem ser sobrescritos no `terraform init` via `-backend-config` ou arquivo `backend.hcl`:
-
----
-terraform init \
-  -backend-config="bucket=hvt-tfstate-production" \
-  -backend-config="key=s3/app-logs/terraform.tfstate" \
-  -backend-config="region=us-east-1" \
-  -backend-config="dynamodb_table=hvt-tfstate-lock" \
-  -backend-config="encrypt=true"
----
-
-## Exemplo de uso
-
----
-module "s3_app_logs" {
-  source = "git::ssh://git@github.com/hvt/terraform-aws-s3-hvt.git?ref=v1.0.0"
-
-  bucket_name = "app-logs"
-  environment = "production"
-
-  owner       = "plataforma"
-  cost_center = "CC-1042"
-
-  # Bucket destino para logs de acesso (deve existir previamente)
-  logging_target_bucket = "hvt-s3-access-logs-production"
-  logging_target_prefix = "logs/app-logs/"
-
-  versioning_enabled = true
-  sse_algorithm      = "AES256"
-
-  additional_tags = {
-    Application = "checkout-api"
-  }
-}
-
-output "app_logs_bucket_id" {
-  value = module.s3_app_logs.id
-}
----
-
-### Exemplo com SSE-KMS
-
----
-module "s3_sensitive_data" {
-  source = "git::ssh://git@github.com/hvt/terraform-aws-s3-hvt.git?ref=v1.0.0"
-
-  bucket_name = "sensitive-data"
-  environment = "production"
-
-  owner       = "seguranca"
-  cost_center = "CC-2001"
-
-  logging_target_bucket = "hvt-s3-access-logs-production"
-
-  sse_algorithm     = "aws:kms"
-  kms_master_key_id = "arn:aws:kms:us-east-1:123456789012:key/abcd-1234-..."
-}
----
-
-## Inputs
-
-| Nome | Descrição | Tipo | Default | Obrigatório |
-|---|---|---|---|:---:|
-| `bucket_name` | Nome do bucket S3 (sem prefixo `hvt-` e sem sufixo de ambiente). | `string` | n/a | sim |
-| `environment` | Ambiente: `dev`, `staging` ou `production`. | `string` | n/a | sim |
-| `owner` | Time ou pessoa responsável. Tag `Owner`. | `string` | n/a | sim |
-| `cost_center` | Centro de custo. Tag `CostCenter`. | `string` | n/a | sim |
-| `logging_target_bucket` | Bucket destino para logs de acesso. | `string` | n/a | sim |
-| `logging_target_prefix` | Prefixo dentro do bucket de logging. | `string` | `""` | não |
-| `versioning_enabled` | Habilita versionamento. | `bool` | `true` | não |
-| `sse_algorithm` | `AES256` (SSE-S3) ou `aws:kms` (SSE-KMS). | `string` | `"AES256"` | não |
-| `kms_master_key_id` | Chave KMS quando `sse_algorithm = "aws:kms"`. | `string` | `null` | não |
-| `force_destroy` | Permite destruir bucket com objetos. | `bool` | `false` | não |
-| `additional_tags` | Tags adicionais mescladas às obrigatórias. | `map(string)` | `{}` | não |
-
-## Outputs
-
-| Nome | Descrição |
-|---|---|
-| `id` | ID (nome) do bucket S3 criado. |
-| `arn` | ARN do bucket. |
-| `bucket_domain_name` | Domain name do bucket. |
-| `bucket_regional_domain_name` | Domain name regional do bucket. |
-
-## Requisitos
-
-| Nome | Versão |
-|---|---|
-| terraform | `>= 1.5.0` |
-| aws provider | `>= 5.0` |
----
-```
 ---
 
 ## Justificativa:
