@@ -1,7 +1,21 @@
 ## Prompt
 ```
 # Task
-Analise as informações no arquivo Questão 03.csv anexo, referentes aos custos da AWS do último mês e retorne as oportunidades de redução de custos priorizadas por impacto informando o percentual de redução de cada recurso e ao final o percentual total de redução, informe o nível de esforço de implementação de cada etapa (baixo, médio ou alto), os risco e pré-requisitos
+Analise as informações abaixo referentes aos custos da AWS do último mês e retorne as oportunidades de redução de custos priorizadas por impacto informando o percentual de redução de cada recurso e ao final o percentual total de redução, informe o nível de esforço de implementação de cada etapa (baixo, médio ou alto), os risco e pré-requisitos
+
+servico,categoria,custo_mensal_usd,uso_medio_pct,observacao
+EC2 reservada,compute,4200,72,contrato de 1 ano
+EC2 on-demand,compute,8200,45,workloads variaveis
+EKS,compute,6700,58,3 clusters
+RDS PostgreSQL,databases,8200,62,multi-AZ
+ElastiCache Redis,databases,2100,40,cluster de producao
+S3 Standard,storage,3100,,5 buckets principais
+EBS gp3,storage,1600,68,volumes de producao
+CloudWatch Logs,observability,2800,,retencao de 90 dias
+CloudWatch Metrics,observability,900,,
+Data Transfer Out,network,1900,,trafego entre regioes
+NAT Gateway,network,1200,,3 gateways ativos
+Lambda,compute,900,30,~12M invocacoes/mes
 
 # Action
 Liste todas as oportunidades de redução de custo ordenando da maior oportunidade para a menor em formato de tabela e um plano de execução por semana da primeira semana até o final do trimestre
@@ -14,185 +28,311 @@ Objetivo: reduzir em, no mínimo, 15% o custo com cloud sem degradar o SLA e a p
 
 ## Modelo
 ```
-Gemini 3 Flash e GPT-5.5
+Gemini 3.5 Flash e GPT-5.5
 ```
 ---
 
-## Output Gemini 3 Flash
+## Output Gemini 3.5 Flash
 
-Com base nos dados do arquivo **Questão 03.csv**, sua fatura mensal atual totaliza **US$ 41.800,00**. Para atingir a meta de redução de, no mínimo, 15% (cerca de **US$ 6.270,00/mês**) sem comprometer o SLA, foquei em otimizações que atacam o baixo uso e os modelos de compra ineficientes.
+```python
+import pandas as pd
 
-Aqui está a análise técnica e o plano de ação estratégico.
+data = [
+    ["EC2 reservada", "compute", 4200, 72, "contrato de 1 ano"],
+    ["EC2 on-demand", "compute", 8200, 45, "workloads variaveis"],
+    ["EKS", "compute", 6700, 58, "3 clusters"],
+    ["RDS PostgreSQL", "databases", 8200, 62, "multi-AZ"],
+    ["ElastiCache Redis", "databases", 2100, 40, "cluster de producao"],
+    ["S3 Standard", "storage", 3100, None, "5 buckets principais"],
+    ["EBS gp3", "storage", 1600, 68, "volumes de producao"],
+    ["CloudWatch Logs", "observability", 2800, None, "retencao de 90 dias"],
+    ["CloudWatch Metrics", "observability", 900, None, ""],
+    ["Data Transfer Out", "network", 1900, None, "trafego entre regioes"],
+    ["NAT Gateway", "network", 1200, None, "3 gateways ativos"],
+    ["Lambda", "compute", 900, 30, "~12M invocacoes/mes"]
+]
+
+df = pd.DataFrame(data, columns=["servico", "categoria", "custo_mensal_usd", "uso_medio_pct", "observacao"])
+
+total_cost = df['custo_mensal_usd'].sum()
+
+# Define reduction opportunities
+# 1. EC2 On-demand: Rightsizing (30% reduction) + Savings Plans (25% on remaining) = ~47% reduction
+# 2. RDS: Reserved Instances (30% reduction) + Rightsizing (10%) = ~37% reduction
+# 3. CloudWatch Logs: Reduce retention and filter (35%)
+# 4. S3: Lifecycle Policies/Intelligent Tiering (20%)
+# 5. NAT Gateway: VPC Endpoints (40%)
+# 6. ElastiCache: Rightsizing (25%)
+# 7. EKS: Spot Instances for non-prod + Node optimization (15%)
+
+opportunities = [
+    {"servico": "EC2 on-demand", "pct_reducao": 45, "esforço": "Médio", "risco": "Downtime planejado para alteração de tipo de instância", "pre_req": "Monitoramento de métricas de CPU/RAM por 2 semanas"},
+    {"servico": "RDS PostgreSQL", "pct_reducao": 30, "esforço": "Baixo", "risco": "Comprometimento financeiro (Lock-in)", "pre_req": "Previsão de uso estável para os próximos 12 meses"},
+    {"servico": "CloudWatch Logs", "pct_reducao": 40, "esforço": "Baixo", "risco": "Perda de logs históricos necessários para auditoria", "pre_req": "Revisão de políticas de compliance e retenção"},
+    {"servico": "S3 Standard", "pct_reducao": 25, "esforço": "Baixo", "risco": "Custo de recuperação de dados se mal configurado", "pre_req": "Análise de padrões de acesso aos buckets"},
+    {"servico": "NAT Gateway", "pct_reducao": 35, "esforço": "Médio", "risco": "Interrupção momentânea de tráfego de rede", "pre_req": "Mapeamento de destinos (S3, DynamoDB) para criar Endpoints"},
+    {"servico": "ElastiCache Redis", "pct_reducao": 20, "esforço": "Médio", "risco": "Pressão de memória em picos de uso", "pre_req": "Validação de métricas de 'FreeableMemory'"},
+    {"servico": "EKS", "pct_reducao": 15, "esforço": "Alto", "risco": "Instabilidade em pods se não houver tolerância a falhas", "pre_req": "Configuração de Pod Disruption Budgets e HPA"}
+]
+
+results = []
+for opp in opportunities:
+    cost = df[df['servico'] == opp['servico']]['custo_mensal_usd'].values[0]
+    reduction_usd = cost * (opp['pct_reducao'] / 100)
+    results.append({
+        "Recurso": opp['servico'],
+        "Redução %": f"{opp['pct_reducao']}%",
+        "Economia Mensal (USD)": reduction_usd,
+        "Esforço": opp['esforço'],
+        "Risco": opp['risco'],
+        "Pré-requisitos": opp['pre_req']
+    })
+
+results_df = pd.DataFrame(results).sort_values(by="Economia Mensal (USD)", ascending=False)
+total_savings = results_df['Economia Mensal (USD)'].sum()
+total_reduction_pct = (total_savings / total_cost) * 100
+
+print(f"Total Cost: {total_cost}")
+print(f"Total Savings: {total_savings}")
+print(f"Total Reduction %: {total_reduction_pct}")
+print(results_df.to_string())
+
+
+
+```
+
+```text
+Total Cost: 41800
+Total Savings: 9890.0
+Total Reduction %: 23.66028708133971
+             Recurso Redução %  Economia Mensal (USD) Esforço                                                    Risco                                              Pré-requisitos
+0      EC2 on-demand       45%                 3690.0   Médio   Downtime planejado para alteração de tipo de instância          Monitoramento de métricas de CPU/RAM por 2 semanas
+1     RDS PostgreSQL       30%                 2460.0   Baixo                     Comprometimento financeiro (Lock-in)           Previsão de uso estável para os próximos 12 meses
+2    CloudWatch Logs       40%                 1120.0   Baixo      Perda de logs históricos necessários para auditoria               Revisão de políticas de compliance e retenção
+6                EKS       15%                 1005.0    Alto  Instabilidade em pods se não houver tolerância a falhas                Configuração de Pod Disruption Budgets e HPA
+3        S3 Standard       25%                  775.0   Baixo         Custo de recuperação de dados se mal configurado                    Análise de padrões de acesso aos buckets
+4        NAT Gateway       35%                  420.0   Médio                Interrupção momentânea de tráfego de rede  Mapeamento de destinos (S3, DynamoDB) para criar Endpoints
+5  ElastiCache Redis       20%                  420.0   Médio                       Pressão de memória em picos de uso                   Validação de métricas de 'FreeableMemory'
+
+
+```
+
+Com base na análise dos custos da AWS do último mês, identificamos um potencial de economia de aproximadamente **23,6% (US$ 9.890,00)**, superando a meta de 15%.
+
+Abaixo estão as oportunidades priorizadas por impacto financeiro e o plano de execução trimestral.
+
+### 1. Oportunidades de Redução de Custos Priorizadas
+
+| Recurso | Redução % | Economia Mensal (USD) | Esforço | Riscos | Pré-requisitos |
+| --- | --- | --- | --- | --- | --- |
+| **EC2 On-demand** | 45% | $3.690 | Médio | Downtime para troca de tipo de instância. | Monitorar CPU/RAM por 14 dias (Rightsizing). |
+| **RDS PostgreSQL** | 30% | $2.460 | Baixo | Lock-in financeiro com a AWS. | Plano de capacidade estável por 12 meses (Reserved Instance). |
+| **CloudWatch Logs** | 40% | $1.120 | Baixo | Perda de histórico para auditorias. | Revisar políticas de retenção e compliance. |
+| **EKS** | 15% | $1.005 | Alto | Instabilidade se o app não for resiliente. | Configurar HPA, VPA e Pod Disruption Budgets. |
+| **S3 Standard** | 25% | $775 | Baixo | Custo de transição se houver muitos objetos pequenos. | Habilitar S3 Intelligent-Tiering nos buckets principais. |
+| **NAT Gateway** | 35% | $420 | Médio | Erros transitórios de rede na migração. | Mapear tráfego para S3/DynamoDB (VPC Endpoints). |
+| **ElastiCache Redis** | 20% | $420 | Médio | Pressão de memória em picos de carga. | Validar métricas de `FreeableMemory` e desalocação. |
+
+**Redução Total Estimada: 23,6% (~US$ 9.890,00/mês)**
 
 ---
 
-### 📊 Oportunidades de Redução de Custos (Priorizadas por Impacto)
+### 2. Plano de Execução Trimestral
 
-Abaixo, as oportunidades ordenadas do maior para o menor impacto financeiro estimado:
+#### **Mês 1: Quick Wins e Diagnóstico (Semanas 1-4)**
 
-| Recurso / Serviço | Oportunidade de Otimização | Redução Estimada (%) | Economia Mensal (USD) | Esforço | Risco | Pré-requisitos |
-| --- | --- | --- | --- | --- | --- | --- |
-| **EC2 on-demand** | Migração para Savings Plans (1 ano) e Rightsizing (uso em 45%) | 35% | $2.870 | Baixo | Baixo | Análise de estabilidade do workload. |
-| **RDS PostgreSQL** | Compra de Instância Reservada (RI) e Rightsizing (uso em 62%) | 30% | $2.460 | Baixo | Baixo | Previsibilidade de uso por 12 meses. |
-| **CloudWatch Logs** | Redução de retenção (90 p/ 30 dias) e filtros de ingestão | 40% | $1.120 | Baixo | Baixo | Política de conformidade de logs da empresa. |
-| **EKS (Clusters)** | Rightsizing de Nodes e uso de Spot Instances em Dev/Stage | 15% | $1.005 | Médio | Médio | Nodes stateless e tolerância a interrupções. |
-| **S3 Standard** | Implementação de Lifecycle Policies (Intelligent Tiering) | 20% | $620 | Baixo | Mínimo | Classificação de dados (quentes vs. frios). |
-| **NAT Gateway** | Implementação de VPC Endpoints (Gateway type p/ S3/Dynamo) | 15% | $180 | Médio | Baixo | Mapeamento de tráfego interno para AWS Services. |
-| **Total Estimado** | **Mix de Otimizações** | **~19,7%** | **$8.255** | -- | -- | -- |
+* **Semana 1:** Implementação de **S3 Intelligent-Tiering** em todos os buckets e revisão de políticas de ciclo de vida (S3 Glacier).
+* **Semana 2:** Ajuste de retenção do **CloudWatch Logs** (ex: reduzir de 90 para 30 dias onde permitido) e exclusão de métricas não utilizadas.
+* **Semana 3:** Início da coleta de métricas detalhadas (Rightsizing) para EC2 e RDS usando AWS Compute Optimizer.
+* **Semana 4:** Auditoria de **Data Transfer Out** e identificação de fluxos entre zonas de disponibilidade que podem ser otimizados.
 
-> **Nota:** A redução total estimada de **19,7%** supera a meta de 15%, garantindo uma margem de segurança caso algum workload não suporte instâncias Spot ou Rightsizing agressivo.
+#### **Mês 2: Otimização de Recursos e Instâncias (Semanas 5-8)**
 
----
+* **Semana 5:** Execução do **Rightsizing de EC2 On-demand**: Redimensionar instâncias com uso médio de 45% para tipos menores ou gerações mais recentes (ex: m5 para m6g/m7g).
+* **Semana 6:** **Rightsizing de RDS**: Avaliar se a instância atual comporta um downgrade ou mudança para Graviton (maior performance/menor custo).
+* **Semana 7:** Otimização do **ElastiCache**: Ajustar nós de Redis baseando-se na memória real utilizada (atualmente em 40%).
+* **Semana 8:** Implementação de **VPC Endpoints** (Gateway e Interface) para reduzir o tráfego processado pelo NAT Gateway.
 
-### 📅 Plano de Execução (Próximo Trimestre)
+#### **Mês 3: Estrutural e Compromissos Financeiros (Semanas 9-12)**
 
-Para não sobrecarregar o time de engenharia e garantir o SLA, o plano é dividido em fases de "Ganhos Rápidos" (Quick Wins) até a "Otimização Estrutural".
-
-#### **Mês 1: Quick Wins & Governança (Semanas 1 - 4)**
-
-* **Semana 1:** Auditoria e alteração da retenção do **CloudWatch Logs** de 90 para 30 dias (ou conforme compliance).
-* **Semana 2:** Ativação do **S3 Intelligent Tiering** em todos os buckets principais para mover dados frios automaticamente.
-* **Semana 3:** Compra de **Compute Savings Plans** para cobrir o baseline do EC2 on-demand e Lambda.
-* **Semana 4:** Compra de **Reserved Instances** para o RDS PostgreSQL (após confirmar que não haverá mudança de engine).
-
-#### **Mês 2: Rightsizing e Eficiência de Rede (Semanas 5 - 8)**
-
-* **Semana 5:** Análise detalhada de instâncias **EC2 on-demand** com uso abaixo de 45% para downgrade de tipo (ex: de `m5.large` para `m5.medium`).
-* **Semana 6:** Aplicação do Rightsizing nas instâncias EC2 validadas.
-* **Semana 7:** Implementação de **VPC Endpoints** para S3, reduzindo o tráfego processado pelo NAT Gateway.
-* **Semana 8:** Revisão do **EBS gp3**. Embora o uso esteja em 68%, verificar volumes órfãos ou snapshots antigos para deleção.
-
-#### **Mês 3: Modernização & Spot (Semanas 9 - 12)**
-
-* **Semana 9:** Teste de **EKS Spot Instances** em ambiente de homologação/desenvolvimento.
-* **Semana 10:** Implementação de Nodes Spot no cluster de produção do **EKS** para workloads não-críticos (workers, filas).
-* **Semana 11:** Ajuste final de escalonamento (HPA/VPA) no EKS para otimizar o uso dos nodes existentes.
-* **Semana 12:** Consolidação de resultados, fechamento do relatório de economia e setup de alertas de orçamento (AWS Budgets) para evitar retrocessos.
+* **Semana 9:** Modernização do **EKS**: Implementar Karpenter para autoscaling eficiente e migrar workloads de Dev/Staging para **Spot Instances**.
+* **Semana 10:** Compra de **Savings Plans ou Reserved Instances** para o novo "baseline" de computação (EC2 e RDS) após os ajustes de rightsizing.
+* **Semana 11:** Revisão de volumes **EBS gp3**: Ajustar IOPS e Throughput para o estritamente necessário (baseline de produção).
+* **Semana 12:** Relatório final de impacto, verificação do SLA/Performance e definição de governança (Tags obrigatórias e orçamentos no AWS Budgets).
 
 ---
 
-### ⚠️ Riscos e Considerações Finais
+### Resumo dos Resultados Esperados
 
-1. **Comprometimento Financeiro:** A compra de Savings Plans e RIs reduz o custo, mas "trava" o pagamento por 1 ou 3 anos. Certifique-se de que a arquitetura não mudará drasticamente nesse período.
-2. **SLA de Disponibilidade:** No EKS, a migração para Spot deve ser feita com cuidado; sempre mantenha uma porcentagem de instâncias *On-Demand* para garantir que o serviço não caia totalmente em caso de falta de capacidade Spot na AWS.
-3. **Logs:** Antes de reduzir a retenção do CloudWatch, verifique se o time de segurança ou auditoria não exige os 90 dias originais. Se sim, mova os logs para S3 Glacier (muito mais barato) em vez de apenas deletá-los.
-
-Com essas ações, você não apenas bate a meta de 15%, como estabelece uma cultura de **FinOps** mais madura para o resto do ano!
+* **Custo Atual:** US$ 41.800,00
+* **Custo Projetado (Final do Trimestre):** US$ 31.910,00
+* **Impacto no SLA:** Nenhum. As reduções focam em desperdício de alocação (overprovisioning) e otimização de modelo de compra, mantendo a redundância Multi-AZ e a disponibilidade dos clusters.
 
 ---
+
 ## Output GPT-5.5
-Analisei o arquivo e há oportunidades claras de otimização — principalmente em **EC2 on-demand, EKS, observabilidade e banco/cache subutilizados**. Abaixo está a priorização por impacto estimado, com percentuais realistas (baseados em boas práticas AWS) sem comprometer SLA.
+
+Com base nos dados fornecidos, o custo mensal atual é de **US$ 41.700/mês**. Para atingir a meta de **redução mínima de 15% sem impacto em SLA e performance**, o potencial identificado é de aproximadamente **US$ 8.240/mês (19,8%)**, o que supera a meta estabelecida.
+
+## Oportunidades de redução priorizadas
+
+| Prioridade | Serviço            | Ação Recomendada                                                    | Redução Estimada (%) | Economia Mensal (USD) | Esforço | Riscos                                          | Pré-requisitos                        |
+| ---------- | ------------------ | ------------------------------------------------------------------- | -------------------- | --------------------- | ------- | ----------------------------------------------- | ------------------------------------- |
+| 1          | EC2 On-Demand      | Migrar carga estável para Savings Plans e Rightsizing               | 30%                  | 2.460                 | Médio   | Subdimensionamento se análise inadequada        | 30 dias de métricas detalhadas        |
+| 2          | CloudWatch Logs    | Reduzir retenção de 90 para 30 dias e exportar histórico para S3    | 50%                  | 1.400                 | Baixo   | Dificuldade em investigações muito antigas      | Aprovação de compliance               |
+| 3          | ElastiCache Redis  | Rightsizing e revisão de nós superdimensionados                     | 35%                  | 735                   | Médio   | Possível aumento de latência em pico            | Testes de carga                       |
+| 4          | Data Transfer Out  | Eliminar tráfego cross-region desnecessário e usar endpoints locais | 35%                  | 665                   | Médio   | Dependências ocultas entre aplicações           | Mapeamento de tráfego                 |
+| 5          | NAT Gateway        | Consolidar gateways e criar VPC Endpoints para AWS Services         | 50%                  | 600                   | Médio   | Dependência de rotas atuais                     | Revisão de arquitetura de rede        |
+| 6          | EKS                | Rightsizing de nodes e otimização do Cluster Autoscaler             | 8%                   | 536                   | Médio   | Escalabilidade insuficiente se mal configurado  | Métricas de utilização                |
+| 7          | Lambda             | Ajustar memória e remover invocações desnecessárias                 | 40%                  | 360                   | Baixo   | Aumento do tempo de execução                    | Profiling das funções                 |
+| 8          | S3 Standard        | Migrar objetos frios para Intelligent-Tiering ou Standard-IA        | 10%                  | 310                   | Baixo   | Aumento de custo de recuperação                 | Análise de acesso aos objetos         |
+| 9          | RDS PostgreSQL     | Rightsizing e otimização de storage/IOPS                            | 3%                   | 246                   | Alto    | Impacto em performance do banco                 | Teste de carga e janela de manutenção |
+| 10         | EBS gp3            | Remover volumes órfãos e ajustar provisionamento                    | 10%                  | 160                   | Baixo   | Exclusão indevida de volume                     | Inventário e backup                   |
+| 11         | CloudWatch Metrics | Revisão de métricas customizadas pouco utilizadas                   | 15%                  | 135                   | Baixo   | Perda de visibilidade operacional               | Inventário de dashboards              |
+| 12         | EC2 Reservada      | Ajustar futuras compras e cobertura de reservas                     | 5%                   | 210                   | Baixo   | Sem impacto imediato devido ao contrato vigente | Renovação futura                      |
+
+### Resumo Financeiro
+
+| Indicador          | Valor          |
+| ------------------ | -------------- |
+| Custo atual        | US$ 41.700/mês |
+| Economia potencial | US$ 8.817/mês  |
+| Redução potencial  | 21,1%          |
+| Meta mínima        | 15%            |
+| Resultado esperado | Meta superada  |
 
 ---
 
-# 📊 Oportunidades de Redução de Custos (priorizadas)
+# Plano de execução até o final do trimestre (13 semanas)
 
-| #  | Recurso            | Custo Atual (USD) | Ação Recomendada                             | Redução Estimada | Economia (USD) | Esforço | Risco | Pré-requisitos                      |
-| -- | ------------------ | ----------------- | -------------------------------------------- | ---------------- | -------------- | ------- | ----- | ----------------------------------- |
-| 1  | EC2 on-demand      | 8200              | Migrar para Savings Plans + Rightsizing      | **35%**          | 2870           | Médio   | Médio | Análise de uso + compromisso mínimo |
-| 2  | EKS                | 6700              | Rightsizing de nodes + autoscaling + spot    | **30%**          | 2010           | Médio   | Médio | Configurar Cluster Autoscaler       |
-| 3  | RDS PostgreSQL     | 8200              | Rightsizing + Reserved Instances             | **25%**          | 2050           | Médio   | Baixo | Métricas de CPU/memória             |
-| 4  | CloudWatch Logs    | 2800              | Reduzir retenção (90 → 30 dias) + compressão | **40%**          | 1120           | Baixo   | Baixo | Política de retenção definida       |
-| 5  | ElastiCache Redis  | 2100              | Rightsizing (uso 40%)                        | **30%**          | 630            | Baixo   | Baixo | Monitorar latência                  |
-| 6  | NAT Gateway        | 1200              | Substituir por NAT Instance ou VPC endpoints | **40%**          | 480            | Médio   | Médio | Revisão de arquitetura              |
-| 7  | S3 Standard        | 3100              | Lifecycle → IA / Glacier                     | **30%**          | 930            | Baixo   | Baixo | Política de acesso aos dados        |
-| 8  | Data Transfer      | 1900              | Reduzir tráfego cross-region + caching       | **20%**          | 380            | Médio   | Médio | Mapear fluxos                       |
-| 9  | EBS gp3            | 1600              | Limpeza de volumes + rightsizing             | **20%**          | 320            | Baixo   | Baixo | Auditoria de volumes                |
-| 10 | EC2 reservada      | 4200              | Otimizar instâncias (72% uso)                | **10%**          | 420            | Baixo   | Baixo | Rightsizing                         |
-| 11 | Lambda             | 900               | Ajuste memória/timeout                       | **20%**          | 180            | Baixo   | Baixo | Monitoramento                       |
-| 12 | CloudWatch Metrics | 900               | Reduzir métricas customizadas                | **15%**          | 135            | Baixo   | Baixo | Revisão de dashboards               |
+## Semana 1
+
+* Levantamento detalhado de custos via Cost Explorer.
+* Habilitar tagging para identificação de workloads.
+* Inventário de recursos EC2, EBS, Redis e RDS.
+* Validar requisitos de retenção de logs com compliance.
+
+**Entrega:** baseline de custos e utilização.
 
 ---
 
-# 💰 Resultado Consolidado
+## Semana 2
 
-* **Custo total atual:** $41.700
-* **Economia potencial:** $11.525
-* **Redução total estimada:** **~27,6%**
+* Identificar instâncias EC2 candidatas a rightsizing.
+* Identificar volumes EBS órfãos.
+* Levantar métricas de uso do Redis.
+* Mapear tráfego entre regiões.
 
-✅ **Meta de 15% atingida com folga**
-
----
-
-# 🧠 Principais Insights
-
-* **Maior desperdício:** EC2 on-demand com apenas 45% de uso
-* **Infra subutilizada:** Redis (40%) e Lambda (30%)
-* **Observabilidade cara:** Logs com retenção excessiva
-* **Arquitetura cara:** NAT Gateway e tráfego entre regiões
+**Entrega:** backlog priorizado de otimizações.
 
 ---
 
-# 🗺️ Plano de Execução (por semana até o trimestre)
+## Semana 3
 
-## 🔹 Semana 1–2 (ganhos rápidos – baixo risco)
+* Ajustar retenção do CloudWatch Logs.
+* Limpar volumes EBS não utilizados.
+* Revisar métricas customizadas do CloudWatch.
 
-* Reduzir retenção do CloudWatch Logs
-* Implementar lifecycle no S3
-* Ajustar Lambda (memória/timeout)
-* Limpar volumes EBS não utilizados
-
-👉 **Impacto esperado:** ~8–10%
+**Economia acumulada esperada:** ~4%.
 
 ---
 
-## 🔹 Semana 3–5
+## Semana 4
 
-* Rightsizing ElastiCache
-* Rightsizing EC2 reservadas
-* Reduzir métricas CloudWatch
+* Implementar Intelligent-Tiering nos buckets S3.
+* Ajustar memória das funções Lambda.
+* Revisar políticas de ciclo de vida do S3.
 
-👉 **Impacto acumulado:** ~12–15%
-
----
-
-## 🔹 Semana 6–8
-
-* Rightsizing RDS + compra de Reserved Instances
-* Implementar Savings Plans para EC2
-
-👉 **Impacto acumulado:** ~20–23%
+**Economia acumulada esperada:** ~5%.
 
 ---
 
-## 🔹 Semana 9–10
+## Semana 5
 
-* Otimizar cluster EKS (autoscaling + spot)
+* Rightsizing do Redis em ambiente não produtivo.
+* Testes de carga.
+* Planejamento de rollout.
 
-👉 **Impacto acumulado:** ~25%
-
----
-
-## 🔹 Semana 11–12 (mais complexas)
-
-* Substituir NAT Gateway
-* Reduzir Data Transfer (arquitetura/cache/CDN)
-
-👉 **Impacto final:** ~27–28%
+**Economia acumulada esperada:** ~7%.
 
 ---
 
-# ⚠️ Riscos principais
+## Semana 6
 
-* **Over-optimization (risco de performance)** → mitigar com monitoramento
-* **Compromissos financeiros (Savings Plans / RI)** → analisar baseline antes
-* **Mudanças em rede (NAT / transfer)** → podem afetar conectividade
+* Aplicar otimizações do Redis em produção.
+* Revisar configuração do Cluster Autoscaler do EKS.
 
----
-
-# ✅ Conclusão
-
-Você tem um cenário muito típico de cloud com:
-
-* superdimensionamento,
-* baixa eficiência de compra,
-* e pouca governança de dados/logs.
-
-Com execução disciplinada, dá para atingir **15% já no primeiro mês** e ultrapassar **25% até o fim do trimestre**, sem impacto em SLA.
+**Economia acumulada esperada:** ~9%.
 
 ---
 
-Se quiser, posso montar um **plano técnico detalhado (com comandos AWS / Terraform)** para implementar cada etapa.
+## Semana 7
+
+* Ajustar node groups do EKS.
+* Remover capacidade ociosa persistente.
+
+**Economia acumulada esperada:** ~10%.
+
+---
+
+## Semana 8
+
+* Identificar workloads estáveis para Savings Plans.
+* Simular cobertura ideal.
+
+**Economia acumulada esperada:** ~10%.
+
+---
+
+## Semana 9
+
+* Contratar Savings Plans.
+* Migrar cargas elegíveis.
+
+**Economia acumulada esperada:** ~15%.
+
+---
+
+## Semana 10
+
+* Revisar arquitetura de NAT Gateway.
+* Criar VPC Endpoints para S3, ECR, CloudWatch e STS.
+
+**Economia acumulada esperada:** ~17%.
+
+---
+
+## Semana 11
+
+* Consolidar NAT Gateways onde possível.
+* Ajustar rotas.
+
+**Economia acumulada esperada:** ~18%.
+
+---
+
+## Semana 12
+
+* Eliminar tráfego cross-region desnecessário.
+* Revisar replicações e integrações.
+
+**Economia acumulada esperada:** ~20%.
+
+---
+
+## Semana 13
+
+* Revisão final dos resultados.
+* Atualização do forecast.
+* Definição de governança contínua de custos.
+* Criação de alertas de orçamento e FinOps.
+
+**Resultado esperado ao final do trimestre**
+
+* Economia recorrente: **US$ 8.000–8.800/mês**
+* Redução total: **19%–21%**
+* Sem degradação de SLA.
+* Ambiente com monitoramento e governança de custos permanentes.
 
 ---
 

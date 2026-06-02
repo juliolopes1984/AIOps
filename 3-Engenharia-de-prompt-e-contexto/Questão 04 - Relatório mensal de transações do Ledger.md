@@ -1,7 +1,29 @@
 ## Prompt:
 ```
 # Task
-Analise o anexo Questão 04.sql onde está descrita a estrutura das duas tabelas mais relevantes do Ledger (PostgreSQL)
+Analise o anexo a estrutura das tabelas transactions e customers, as mais relevantes do Ledger (PostgreSQL)
+
+CREATE TABLE transactions (
+  id              BIGSERIAL PRIMARY KEY,
+  customer_id     BIGINT NOT NULL REFERENCES customers(id),
+  category        VARCHAR(32) NOT NULL,
+  amount_cents    BIGINT NOT NULL,
+  status          VARCHAR(16) NOT NULL,
+  payment_method  VARCHAR(16),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at    TIMESTAMPTZ
+);
+
+CREATE INDEX idx_transactions_created_at ON transactions(created_at);
+CREATE INDEX idx_transactions_status ON transactions(status);
+CREATE INDEX idx_transactions_category ON transactions(category);
+
+CREATE TABLE customers (
+  id          BIGSERIAL PRIMARY KEY,
+  segment     VARCHAR(16) NOT NULL,
+  country     CHAR(2) NOT NULL,
+  signup_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 # Action
 Escreva uma query SQL que faça a seguinte busca: 
@@ -15,94 +37,86 @@ Objetivo: busque as informações dos últimos 6 meses corridos a contar da data
 
 ## Modelo:
 ```
-Gemini 3.1 Pro e Opus 4.7
+Gemini 3.1 Pro e Opus 4.8
 ```
 ---
 
 ## Output Gemini 3.1 Pro:
-Aqui está a query SQL (PostgreSQL) construída para atender a todos os requisitos solicitados:
+
+Aqui está a query SQL para o PostgreSQL que atende a todos os seus requisitos.
+
+Note que a tabela `customers` não precisou ser unida (`JOIN`) nesta consulta, pois todas as informações necessárias para este relatório (categoria, status, datas e valores) já estão contidas na tabela `transactions`.
+
+### Query SQL
 
 ```sql
 SELECT 
     TO_CHAR(created_at, 'YYYY-MM') AS mes,
     category AS categoria,
-    COUNT(id) AS quantidade_transacoes,
-    REPLACE(TO_CHAR(SUM(amount_cents) / 100.0, 'FM9999999999999990.00'), '.', ',') AS volume_total_reais
+    COUNT(*) AS quantidade_transacoes,
+    REPLACE(TO_CHAR(SUM(amount_cents) / 100.0, 'FM999999999990.00'), '.', ',') AS volume_total_reais
 FROM 
     transactions
 WHERE 
     status = 'completed'
     AND category IN ('subscription', 'one_time', 'refund', 'credit_adjustment')
-    -- Últimos 6 meses corridos a contar de 2026-04-24 (inclusive)
-    AND created_at >= '2026-04-24'::date - INTERVAL '6 months'
-    AND created_at < '2026-04-24'::date + INTERVAL '1 day'
+    -- Últimos 6 meses corridos a contar de 2026-04-24 (2025-10-24 até o final do dia 2026-04-24)
+    AND created_at >= '2026-04-24'::DATE - INTERVAL '6 months'
+    AND created_at < '2026-04-25'::DATE
 GROUP BY 
     TO_CHAR(created_at, 'YYYY-MM'),
     category
 ORDER BY 
-    mes ASC,
+    mes ASC, 
     categoria ASC;
 
 ```
 
-### Explicação dos recursos utilizados:
+---
 
-* **Filtros de Data (Range Seguro):** Utilize `INTERVAL '6 months'` subtraído da data limite e `< data + INTERVAL '1 day'` para garantir que capturamos as transações até o último segundo do dia 24 de abril de 2026. Fazer isso dessa forma permite que o PostgreSQL faça o uso adequado do índice `idx_transactions_created_at`.
-* **Conversão para Reais (`/ 100.0`):** Ao dividir por `100.0` (com o `.0`), forçamos o banco de dados a tratar o resultado como um valor decimal e não arredondar para o inteiro mais próximo.
-* **Formatação de Moeda com Vírgula:** O PostgreSQL usa ponto `.` como separador decimal padrão. O uso do `TO_CHAR(..., 'FM...0.00')` força a exibição de exatas duas casas decimais, enquanto a função `REPLACE()` troca o ponto por vírgula no resultado final.
-* **Agrupamento:** O `GROUP BY` considera a string do mês formatado em `YYYY-MM` e a respectiva categoria, alinhando com a exigência de exibir a saída de forma segregada por essas duas dimensões.
+### Detalhamento das decisões técnicas:
+
+* **Conversão de Moeda e Formatação:** O campo `amount_cents` é somado primeiro e, em seguida, dividido por `100.0` (o `.0` garante que o PostgreSQL trate o resultado como decimal e não arredonde por divisão inteira). A função `TO_CHAR` com o modificador `FM999999999990.00` força a saída com duas casas decimais fixas, e o `REPLACE` troca o ponto nativo do banco de dados pela vírgula (padrão brasileiro).
+* **Filtro de Data (`created_at`):** Utilizei a regra matemática de datas nativa do PostgreSQL. `INTERVAL '6 months'` garante retroagir exatamente para o dia 24 de outubro. O operador `< '2026-04-25'` foi utilizado no lugar de `<=` para garantir que transações ocorridas até o último segundo de `2026-04-24 (23:59:59)` sejam contabilizadas adequadamente, respeitando o tipo `TIMESTAMPTZ`.
+* **Agrupamento:** O `TO_CHAR` foi utilizado no campo de data diretamente no `GROUP BY` e no `SELECT` para padronizar a granularidade mensal (`YYYY-MM`), conforme solicitado.
+* **Performance:** A query tira pleno proveito do índice existente `idx_transactions_created_at` (devido à busca por range de datas) e do índice `idx_transactions_status` ao buscar apenas as transações completadas.
 
 ---
-## Output Opus 4.7:
+## Output Opus 4.8:
 
-Olhando para o esquema e os requisitos, vou montar a query passo a passo.
-
-Pontos importantes a considerar:
-
-- **Janela de tempo**: "últimos 6 meses corridos" a contar de 2026-04-24 → de 2025-10-24 (inclusive) até 2026-04-24 (exclusivo, para não pegar o próprio dia 24/04 parcialmente, mas isso é interpretável — usarei `>=` e `<` para segurança).
-- **Filtros**: `status = 'completed'` e `category IN ('subscription','one_time','refund','credit_adjustment')`.
-- **Conversão centavos → reais**: dividir por 100.0 e formatar com vírgula como separador decimal usando `to_char` com locale-independente: máscara `'FM999G999G990D00'` + `to_char` aceita modificadores de agrupamento, mas a forma mais previsível é usar `TO_CHAR(valor, 'FM999999999990D00')` que já produz `,` como separador decimal no PostgreSQL quando `lc_numeric` está em pt_BR — porém isso depende do locale. A forma robusta é construir manualmente com `REPLACE`.
-- **Agrupamento por mês**: `TO_CHAR(created_at, 'YYYY-MM')`.
-
-Vou usar `REPLACE` para garantir a vírgula independente do locale do servidor:
+Segue a query, com explicação das decisões logo abaixo.
 
 ```sql
 SELECT
-    TO_CHAR(created_at, 'YYYY-MM')                                      AS mes,
-    category                                                            AS categoria,
-    COUNT(*)                                                            AS qtd_transacoes,
-    REPLACE(
-        TO_CHAR(SUM(amount_cents) / 100.0, 'FM999999999990.00'),
-        '.', ','
-    )                                                                   AS volume_reais
-FROM transactions
-WHERE status = 'completed'
-  AND category IN ('subscription', 'one_time', 'refund', 'credit_adjustment')
-  AND created_at >= DATE '2026-04-24' - INTERVAL '6 months'
-  AND created_at <  DATE '2026-04-24'
+    to_char(date_trunc('month', t.created_at), 'YYYY-MM')                  AS mes,
+    t.category                                                             AS categoria,
+    count(*)                                                               AS qtd_transacoes,
+    translate(
+        to_char(sum(t.amount_cents) / 100.0, 'FM999,999,999,990.00'),
+        '.,', ',.'
+    )                                                                      AS volume_reais
+FROM transactions AS t
+WHERE t.status = 'completed'
+  AND t.category IN ('subscription', 'one_time', 'refund', 'credit_adjustment')
+  AND t.created_at >= DATE '2026-04-24' - INTERVAL '6 months'
+  AND t.created_at <  DATE '2026-04-24'
 GROUP BY
-    TO_CHAR(created_at, 'YYYY-MM'),
-    category
+    date_trunc('month', t.created_at),
+    t.category
 ORDER BY
-    mes ASC,
-    categoria ASC;
+    date_trunc('month', t.created_at) ASC,
+    t.category ASC;
 ```
 
-Observações sobre decisões que tomei:
+Pontos de decisão e premissas (vale conferir se batem com o que você espera):
 
-A janela `>= 2025-10-24` e `< 2026-04-24` cobre exatamente 6 meses corridos terminando no dia da referência. Se a intenção for incluir o próprio dia 24/04/2026, basta trocar o segundo limite para `<= DATE '2026-04-24' + INTERVAL '1 day'` ou usar `<= '2026-04-24 23:59:59.999999'`. Como o enunciado diz "a contar da data de 2026-04-24", interpretei como ponto de corte (não incluído), o que é o comportamento mais comum em relatórios.
+**Janela dos 6 meses.** Interpretei "6 meses corridos a contar de 2026-04-24" como uma janela móvel de 6 meses que termina nessa data: `created_at >= '2025-10-24'` e `created_at < '2026-04-24'`. Como `created_at` é um timestamp, usei `<` para a data final (em vez de `<=`) para não cortar transações do próprio dia 24 de forma ambígua. Note que, por ser janela móvel, o agrupamento por `YYYY-MM` vai render buckets parciais nas pontas (out/2025 a partir do dia 24, e abr/2026 até o dia 24). Se você quer os 6 meses-calendário *completos*, troque a faixa por `>= date_trunc('month', DATE '2026-04-24') - INTERVAL '6 months'` e `< date_trunc('month', DATE '2026-04-24')`.
 
-O `REPLACE(TO_CHAR(..., 'FM999999999990.00'), '.', ',')` força a vírgula como separador decimal independentemente do `lc_numeric` do servidor — mais previsível que confiar no locale. O `FM` remove espaços de preenchimento à esquerda. Se você também quiser separador de milhar com ponto (padrão BR, ex.: `1.234,56`), troque para:
+**Qual data usar.** Usei `created_at` por ser `NOT NULL`, indexada e ser a data natural da transação — o filtro fica eficiente com `idx_transactions_created_at`. Se o relatório deve ancorar no momento em que a transação foi *concluída*, é só trocar os três usos de `created_at` por `completed_at` (que é anulável, então pode valer adicionar `AND t.completed_at IS NOT NULL`).
 
-```sql
-REPLACE(REPLACE(TO_CHAR(SUM(amount_cents) / 100.0, 'FM999G999G990D00'), '.', '#'), ',', '.')
-```
+**Formatação em reais.** `amount_cents / 100.0` converte centavos para reais, e o `to_char` + `translate` produz o padrão brasileiro (ponto como separador de milhar, vírgula como decimal), ex.: `1.234.567,89`. Se você não quer o separador de milhar, troque o formato por `'FM999990.00'`. Valores negativos (caso refunds/ajustes sejam armazenados assim) saem com `-` na frente normalmente.
 
-mas isso depende novamente do locale; a versão acima (sem separador de milhar) é a mais segura sem mais informações.
-
-O `ORDER BY mes, categoria` usa os aliases — funciona em PostgreSQL na cláusula `ORDER BY`. Como `mes` é texto no formato `YYYY-MM`, a ordenação lexicográfica coincide com a cronológica, então está correto.
-
-Os índices existentes em `created_at`, `status` e `category` ajudam o planner a filtrar antes do `GROUP BY`. Se essa query for executada com frequência, um índice composto `(status, category, created_at)` seria mais eficiente que os três separados, mas isso é otimização fora do escopo do pedido.
+Quer que eu ajuste para meses-calendário completos ou para ancorar em `completed_at`?
 
 ---
 
